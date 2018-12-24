@@ -42,14 +42,11 @@ func DownloadFile(w http.ResponseWriter, req *http.Request, next utils.NextFunc)
 	//token := fmt.Sprintf("%x", h.Sum(checksum))
 
 	//要登录后才能使用上传文件
-	header := req.Header
-	token := header.Get("Authorization")
-	user := services.GetCurrentUser(token)
+	user := services.GetCurrentUser(req.Header.Get("Authorization"))
 	timeStr:=time.Now().Format("20060102150405")  //当前时间的字符串，2006-01-02 15:04:05据说是golang的诞生时间，固定写法
-	fileName := user.Username + "at" +timeStr + "." + filename[1]
+	fileName := user.Username + "at" + timeStr + "." + filename[1]
 
-	user.Iconpath = fileName
-	models.UpdateUserByID(user.UserID,*user)
+	models.UpdateUserIconByID(user.UserID, fileName)
 	//fileEndings, err := mime.ExtensionsByType(filetype)
 	if err != nil {
 		return utils.SendData(w, "{}","CANT_READ_FILE_TYPE", http.StatusInternalServerError)
@@ -59,8 +56,7 @@ func DownloadFile(w http.ResponseWriter, req *http.Request, next utils.NextFunc)
 
 	newPath := downloadFilePath + fileName
 
-	//fmt.Printf("FileType: %s, File: %s\n", filetype, newPath)
-	fmt.Printf(newPath)
+	// fmt.Printf("FileType: %s, File: %s\n", filename[1], newPath)
 	newFile, err := os.Create(newPath)
 	if err != nil {
 		return utils.SendData(w, "{}","CANT_WRITE_FILE", http.StatusInternalServerError)
@@ -103,9 +99,7 @@ func DownloadPostFile(w http.ResponseWriter, req *http.Request, next utils.NextF
 	//token := fmt.Sprintf("%x", h.Sum(checksum))
 
 	//要登录后才能使用上传文件
-	header := req.Header
-	token := header.Get("Authorization")
-	user := services.GetCurrentUser(token)
+	user := services.GetCurrentUser(req.Header.Get("Authorization"))
 	timeStr:=time.Now().Format("20060102150405")  //当前时间的字符串，2006-01-02 15:04:05据说是golang的诞生时间，固定写法
 	fileName := user.Username + "at" +timeStr + "." + filename[1]
 
@@ -118,8 +112,6 @@ func DownloadPostFile(w http.ResponseWriter, req *http.Request, next utils.NextF
 
 	newPath := downloadFilePath + fileName
 
-	//fmt.Printf("FileType: %s, File: %s\n", filetype, newPath)
-	fmt.Printf(newPath)
 	newFile, err := os.Create(newPath)
 	if err != nil {
 		return utils.SendData(w, "{}","CANT_WRITE_FILE", http.StatusInternalServerError)

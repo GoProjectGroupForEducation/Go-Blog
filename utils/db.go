@@ -1,98 +1,118 @@
 package utils
 
 import (
-	"github.com/boltdb/bolt"
+	"database/sql"
+	"fmt"
+	_ "github.com/go-sql-driver/mysql"
+	"time"
 )
 
-type DB struct {
-	conn *bolt.DB
-}
+var DB *sql.DB
+var err error
 
-func (db *DB) getConn() *bolt.DB {
-	conn, err := bolt.Open("data.db", 0600, nil)
+func init() {
+	DB, err = sql.Open("mysql", "blogdb:zsy2720a@tcp(172.17.0.1:3306)/blogdb?charset=utf8&loc=Asia%2FShanghai&parseTime=true")
+	err = DB.Ping()
+	for {
+		if err == nil {
+			break
+		}
+		fmt.Println("Trying...")
+		time.Sleep(time.Duration(2)*time.Second)
+		err = DB.Ping()
+	}
+
+	// Users
+	users := `
+    CREATE TABLE IF NOT EXISTS user(
+        id INTEGER PRIMARY KEY AUTO_INCREMENT,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        email TEXT NOT NULL,
+        password TEXT NOT NULL,
+        iconPath TEXT NOT NULL
+    );
+    `
+
+
+	_ ,err = DB.Exec(users)
 	if err != nil {
 		panic(err)
 	}
-	db.conn = conn
-	return db.conn
-}
+	// UserRelations
+	userRelations := `
+    CREATE TABLE IF NOT EXISTS userRelations(
+        UserId INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE ,
+        followerId INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+		PRIMARY KEY (UserId, followerId)
+    );
+    `
 
-func (db *DB) Get(bucket string, key string) []byte {
-	conn := db.getConn()
-	defer conn.Close()
-	var value []byte
-	err := conn.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists([]byte(bucket))
-		if err != nil {
-			panic(err)
-		}
-		val := b.Get([]byte(key))
-		value = make([]byte, len(val))
-		copy(value, val)
-		return nil
-	})
+	_ ,err = DB.Exec(userRelations)
 	if err != nil {
 		panic(err)
 	}
-	return value
-}
 
-func (db *DB) Set(bucket string, key string, value string) error {
-	conn := db.getConn()
-	defer conn.Close()
-	var ret error
-	err := conn.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists([]byte(bucket))
-		if err != nil {
-			panic(err)
-		}
-		ret = b.Put([]byte(key), []byte(value))
-		return nil
-	})
+	// Tags
+	tags := `
+    CREATE TABLE IF NOT EXISTS Tags(
+        content VARCHAR(255) NOT NULL PRIMARY KEY
+    );
+    `
+	_ ,err = DB.Exec(tags)
 	if err != nil {
 		panic(err)
 	}
-	return ret
-}
 
-func (db *DB) GenerateID(bucket string) int {
-	conn := db.getConn()
-	defer conn.Close()
-	var id int
-	err := conn.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists([]byte(bucket))
-		if err != nil {
-			panic(err)
-		}
-		ret, _ := b.NextSequence()
-		id = int(ret)
-		return nil
-	})
+	// Articles
+	articles := `
+    CREATE TABLE IF NOT EXISTS Articles(
+        id INTEGER  PRIMARY KEY AUTO_INCREMENT,
+        title TEXT,
+        content MEDIUMTEXT,
+      	createdAt DATETIME,
+      	updatedAt DATETIME,
+      	authorId INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
+    );
+    `
+	_ ,err = DB.Exec(articles)
 	if err != nil {
 		panic(err)
 	}
-	return id
-}
 
-func (db *DB) Scan(bucket string) map[string]string {
-	conn := db.getConn()
-	defer conn.Close()
-	var value = make(map[string]string)
-	err := conn.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists([]byte(bucket))
-		if err != nil {
-			panic(err)
-		}
-		c := b.Cursor()
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			tempk := string(k)
-			tempv := string(v)
-			value[tempk] = tempv
-		}
-		return nil
-	})
+	// Comments
+	comments := `
+    CREATE TABLE IF NOT EXISTS Comments(
+        id INTEGER  PRIMARY KEY AUTO_INCREMENT,
+        content TEXT,
+      	createdAt DATETIME,
+      	updatedAt DATETIME,
+      	articleId INTEGER NOT NULL REFERENCES Articles(id) ON DELETE CASCADE ON UPDATE CASCADE,
+      	authorId INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
+    );
+    `
+	_ ,err = DB.Exec(comments)
 	if err != nil {
 		panic(err)
 	}
-	return value
+
+	// postTags
+	postTags := `
+    CREATE TABLE IF NOT EXISTS postTags(
+      	ArticleId INTEGER NOT NULL REFERENCES Articles(id) ON DELETE CASCADE ON UPDATE CASCADE,
+      	TagContent VARCHAR(255) NOT NULL REFERENCES Tags(content) ON DELETE CASCADE ON UPDATE CASCADE,
+		PRIMARY KEY (ArticleId, TagContent)
+    );
+    `
+
+	_ ,err = DB.Exec(postTags)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Create database successfully!")
 }
+
+func GetConn() *sql.DB {
+	return DB;
+}
+

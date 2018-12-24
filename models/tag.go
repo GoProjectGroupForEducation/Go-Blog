@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"github.com/GoProjectGroupForEducation/Go-Blog/utils"
 )
 
@@ -10,39 +9,24 @@ type Tag struct {
 }
 
 func CreateTag(tag string) {
-	db := &utils.DB{}
-
-	if !isTagExist(tag) {
-		tagItem := Tag{tag}
-		buff, err := json.Marshal(tagItem)
-		if err != nil {
-			panic("JSON parsing error")
-		}
-		db.Set("tag", tag, string(buff))
+	stmt, err := utils.GetConn().Prepare("insert into Tags values (?)")
+	if err != nil {
+		panic("db insert prepare error")
 	}
+	stmt.Exec(tag)
 }
 
-func isTagExist(content string) bool {
-	db := &utils.DB{}
-	buff := db.Get("tag", content)
-	if len(buff) == 0 {
-		return false
-	}
-	return true
-}
 
-func ScanTag() []Tag {
-	db := &utils.DB{}
-	var tagsBytes map[string]string
-	var tag Tag
-	var tags = []Tag{}
-	tagsBytes = db.Scan("tag")
-	for _, one := range tagsBytes {
-		err := json.Unmarshal([]byte(one), &tag)
+func GetAllTags() []Tag {
+	tags := []Tag{}
+	row, err := utils.GetConn().Query("SELECT content FROM Tags")
+	if err != nil {
+		panic("error")
+	}
+	for row.Next() {
+		tag := Tag{}
+		err = row.Scan(&tag.Content)
 		tags = append(tags, tag)
-		if err != nil {
-			panic(err)
-		}
 	}
 	return tags
 }

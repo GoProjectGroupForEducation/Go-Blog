@@ -1,66 +1,71 @@
 package services
 
 import (
-	"crypto/md5"
-	"fmt"
-	"io"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/GoProjectGroupForEducation/Go-Blog/utils"
 
 	"github.com/GoProjectGroupForEducation/Go-Blog/models"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go/request"
 )
 
-var checksum = []byte("heng-is-a-very-handsome-boy")
+var (
+	SecretKey = []byte( "awesome jwt nice to use")
+)
 
-func GenerateAuthToken(userID int, username string) models.AuthToken {
-	h := md5.New()
-	expiredTime := time.Now().UnixNano()/1e6 + 1000*60*60*3 // expired time is 3 hours
-	source := strconv.FormatInt(expiredTime, 10) + strconv.Itoa(userID)
-	io.WriteString(h, source)
-	token := fmt.Sprintf("%x", h.Sum(checksum))
-	authToken := models.AuthToken{
-		// 0,
-		token,
-		userID,
-		username,
-		strconv.FormatInt(expiredTime, 10),
-	}
-	models.CreateToken(authToken)
-	// authToken.TokenID = id
-	return authToken
+type Token struct {
+	Token string `json:"token"`
 }
 
-func authenticateToken(token string) bool {
-	// id := token.TokenID
-	real := models.GetToken(token)
-	if real == nil {
-		return false
-	}
-	// if (token.Token != real.Token) ||
-	// 	(token.AuthorizedID != real.AuthorizedID) ||
-	// 	(token.ExpiredTime != real.ExpiredTime) {
-	// 	return false
-	// }
-	if real.ExpiredTime < strconv.FormatInt((time.Now().UnixNano()/1e6), 10) {
-		return false
-	}
-
-	return true
+type CustomerClaims struct {
+	User *models.User
+	jwt.StandardClaims
 }
 
-func GetCurrentUser(token string) *models.User {
-	data := models.GetToken(token)
-	user := models.GetUserByID(data.AuthorizedID)
-	return user
+func GenerateAuthToken(user *models.User) Token {
+	expireToken := time.Now().Add(time.Hour * 24).Unix()
+
+	claims := CustomerClaims{
+		user,
+		jwt.StandardClaims{
+			ExpiresAt: expireToken,
+			Issuer: "test.com",
+		},
+	}
+	 token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	tokenString, err := token.SignedString(SecretKey)
+	if err != nil {
+		return Token{""}
+	}
+	return Token{tokenString}
 }
+
+func GetCurrentUser(tokenStr string) *models.User {
+	token, err := jwt.ParseWithClaims(tokenStr[7:], &CustomerClaims{}, func(token *jwt.Token) (i interface{}, e error) {
+		return SecretKey, nil
+	})
+	if err == nil {
+		if claims, ok := token.Claims.(*CustomerClaims); ok && token.Valid {
+			username := claims.User.Username
+			return models.GetUserByUsername(username)
+		} else {
+			return nil
+		}
+	}
+	return nil
+}
+
 
 func AuthenticationGuard(w http.ResponseWriter, req *http.Request, next utils.NextFunc) error {
-	header := req.Header
-	token := header.Get("Authorization")
-	if authenticateToken(token) {
+	token, err := request.ParseFromRequest(req, request.AuthorizationHeaderExtractor,
+		func(token *jwt.Token) (i interface{}, e error) {
+			return SecretKey, nil
+		})
+	if err == nil && token.Valid {
 		return next()
 	} else {
 		panic(utils.Exception{"Need to login first", http.StatusUnauthorized})

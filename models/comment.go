@@ -1,8 +1,7 @@
 package models
 
 import (
-	"encoding/json"
-	"strconv"
+	"fmt"
 	"time"
 
 	"github.com/GoProjectGroupForEducation/Go-Blog/utils"
@@ -26,46 +25,50 @@ type Comment struct {
 }
 
 func CreateComment(comment *Comment) int {
-	db := &utils.DB{}
-	id := db.GenerateID("comment")
-	comment.ID = id
-	comment.CreatedAt = time.Now()
-	buff, err := json.Marshal(comment)
+	stmt, err := utils.GetConn().Prepare("insert into Comments values (?, ?, ?, ?, ? , ?)")
 	if err != nil {
-		panic(err)
+		panic("db insert prepare error")
 	}
-	db.Set("comment", strconv.Itoa(id), string(buff))
-	return id
+	res, err := stmt.Exec(nil, comment.Content, time.Now(), time.Now(), comment.ArticleID, comment.CreatorID)
+	if err != nil {
+		panic("db insert error")
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		panic("db insert error")
+	}
+
+	return int(id)
 }
 
 func GetAllCommentsByArticleID(articleID int) []CommentList {
-	db := &utils.DB{}
-	comments := db.Scan("comment")
-	var result = []CommentList{}
-	for _, v := range comments {
-		tmp := CommentList{}
-		err := json.Unmarshal([]byte(v), &tmp)
-		tmp.Creator = *GetUserListByID(tmp.CreatorID)
-		if err != nil {
-			panic(err)
-		}
-		if tmp.ArticleID == articleID {
-			result = append(result, tmp)
-		}
+	comments := []CommentList{}
+	row, err := utils.GetConn().Query("SELECT id, content, createdAt, articleId, authorId FROM Comments c WHERE c.ArticleId = ? ", articleID)
+	if err != nil {
+		panic(err)
 	}
-	return result
+
+	for row.Next() {
+		comment := CommentList{}
+		err = row.Scan(&comment.ID, &comment.Content, &comment.CreatedAt, &comment.ArticleID, &comment.CreatorID)
+		comments = append(comments, comment)
+	}
+
+	if err != nil {
+		panic(err)
+	}
+	return comments
 }
 
 func UpdateCommentByID(comment Comment) bool {
-	db := &utils.DB{}
-	buff := db.Get("comment", strconv.Itoa(comment.ID))
-	if len(buff) == 0 {
-		return false
-	}
-	buff, err := json.Marshal(comment)
+	stmt, err := utils.GetConn().Prepare("update Comments set content=?, updatedAt=? where id=?")
 	if err != nil {
-		panic("JSON parsing error")
+		fmt.Println("error:", err)
 	}
-	db.Set("comment", strconv.Itoa(comment.ID), string(buff))
+	_, err = stmt.Exec(comment.Content, time.Now(), comment.ArticleID)
+	if err != nil {
+		panic(err)
+	}
 	return true
 }

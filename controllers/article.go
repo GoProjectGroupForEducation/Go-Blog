@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -76,14 +75,16 @@ func CreateArticle(w http.ResponseWriter, req *http.Request, next utils.NextFunc
 	author := services.GetCurrentUser(req.Header.Get("Authorization"))
 	buff, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	err = json.Unmarshal(buff, &article)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	article.Author = author.UserID
+
 	id := models.CreateArticle(article)
+
 	return utils.SendData(w, `{
   "id": `+strconv.Itoa(id)+`
 }`, "Create successfully", http.StatusOK)
@@ -122,7 +123,6 @@ func UpdateArticleByID(w http.ResponseWriter, req *http.Request, next utils.Next
 	article.Author = author.UserID
 	article.UpdatedAt = time.Now()
 	err = json.Unmarshal(buff, &article)
-	fmt.Println(article.Tags)
 	if err != nil {
 		return err
 	}

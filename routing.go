@@ -108,9 +108,6 @@ func routeArticle() {
 
 func routeUser() {
 	sub := rootRouter.PathPrefix("/user").Subrouter()
-	sub.HandleFunc("/allusers", utils.HandlerCompose(
-		controllers.GetAllUsers,
-	)).Methods("GET")
 	sub.HandleFunc("/register", utils.HandlerCompose(
 		controllers.CreateUser,
 	)).Methods("POST")
