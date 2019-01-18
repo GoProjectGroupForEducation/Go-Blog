@@ -9,6 +9,8 @@ layout: default
 
 章恒 - [Docker 开发初体验](https://clearloveh.github.io/2018/12/20/service-computing-docker/)
 
+钟霖 -[Docker 学习笔记]( https://mp.csdn.net/mdeditor/86543364)
+
 ### Docker部署实践
 具体的Dockerfile的书写在[小组个人的博客](https://zhongwq.github.io/ServiceComputingOnCloud/%E9%A1%B9%E7%9B%AE%E5%AE%B9%E5%99%A8%E5%8C%96-DockerFile%E5%AD%A6%E4%B9%A0%E4%B9%8B%E8%B7%AF/)里已经给出，这里简单说说写好Dockerfile后的部署过程
 
